@@ -15,11 +15,14 @@ export async function createClient() {
         return cookieStore.getAll();
       },
       setAll(cookiesToSet: any[]) {
-  try {
-    cookiesToSet.forEach(({ name, value, options }) => {
-      cookieStore.set(name, value, options);
-    });
-  } catch {
-    // Server Component에서는 set이 막힐 수 있음
-  }
-},
+        try {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            cookieStore.set(name, value, options);
+          });
+        } catch {
+          // Server Component에서는 set이 막힐 수 있음. Route Handler/Server Action에서 처리.
+        }
+      },
+    },
+  });
+}
