@@ -5,7 +5,18 @@ import { createClient } from "@/lib/supabase/browser";
 
 const GRADES = ["A", "B", "C"] as const;
 const DEAL_TYPES = ["매매", "전세", "월세"] as const;
-const PROPERTY_TYPES = ["상가", "사무실", "원룸", "투룸", "쓰리룸", "아파트", "빌라", "단독", "건물", "토지"] as const;
+const PROPERTY_TYPES = [
+  "상가",
+  "사무실",
+  "원룸",
+  "투룸",
+  "쓰리룸",
+  "아파트",
+  "빌라",
+  "단독",
+  "건물",
+  "토지",
+] as const;
 
 type Row = {
   id: string;
@@ -102,6 +113,30 @@ function Textarea({
   );
 }
 
+// ---- API helpers ----
+async function apiGet(): Promise<Row[]> {
+  const res = await fetch("/api/customer-requests", { cache: "no-store" });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error || "불러오기 실패");
+  return (json.data || []) as Row[];
+}
+
+async function apiUpsert(body: any) {
+  const res = await fetch("/api/customer-requests", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error || "저장 실패");
+}
+
+async function apiDelete(id: string) {
+  const res = await fetch(`/api/customer-requests?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error || "삭제 실패");
+}
+
 export default function Page() {
   const supabase = createClient();
 
@@ -135,27 +170,19 @@ export default function Page() {
 
   const load = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("customer_requests")
-      .select("*")
-      // 다음연락예정일 가까운 순 -> 없으면 뒤로
-      .order("next_contact_date", { ascending: true, nullsFirst: false })
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      alert(error.message);
+    try {
+      const data = await apiGet();
+      setRows(data);
+    } catch (e: any) {
+      alert(e?.message || "불러오기 실패");
       setRows([]);
+    } finally {
       setLoading(false);
-      return;
     }
-
-    setRows((data ?? []) as any);
-    setLoading(false);
   };
 
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const filtered = useMemo(() => {
@@ -229,27 +256,13 @@ export default function Page() {
     setOpen(true);
   };
 
-  // ✅ RLS 에러 해결 포인트: INSERT/UPDATE 전에 user_id를 명시적으로 넣어줌
   const save = async () => {
     if (!form.phone.trim()) {
       alert("연락처는 필수입니다.");
       return;
     }
 
-    const { data: userData, error: userErr } = await supabase.auth.getUser();
-    if (userErr) {
-      alert(userErr.message);
-      return;
-    }
-
-    const userId = userData?.user?.id;
-    if (!userId) {
-      alert("로그인 세션이 확인되지 않습니다. 다시 로그인 해주세요.");
-      return;
-    }
-
     const payload: any = {
-      user_id: userId, // ✅ 중요
       phone: form.phone.trim(),
       first_inquiry_date: form.first_inquiry_date || null,
       grade: form.grade || null,
@@ -263,30 +276,27 @@ export default function Page() {
       note: form.note || null,
     };
 
-    const { error } = editing
-      ? await supabase.from("customer_requests").update(payload).eq("id", editing.id)
-      : await supabase.from("customer_requests").insert(payload);
+    const body = editing ? { id: editing.id, ...payload } : payload;
 
-    if (error) {
-      alert(error.message);
-      return;
+    try {
+      await apiUpsert(body);
+      setOpen(false);
+      await load();
+    } catch (e: any) {
+      alert(e?.message || "저장 실패");
     }
-
-    setOpen(false);
-    await load();
   };
 
   const remove = async (r: Row) => {
-    const ok = confirm(`삭제할까?\n\n연락처: ${r.phone}\n매물종류: ${r.property_type ?? "-"}\n희망지역: ${r.preferred_area ?? "-"}`);
+    const ok = confirm(`삭제할까?\n\n연락처: ${r.phone}\n매물종류: ${r.property_type ?? "-"}`);
     if (!ok) return;
 
-    const { error } = await supabase.from("customer_requests").delete().eq("id", r.id);
-    if (error) {
-      alert(error.message);
-      return;
+    try {
+      await apiDelete(r.id);
+      await load();
+    } catch (e: any) {
+      alert(e?.message || "삭제 실패");
     }
-
-    await load();
   };
 
   const signOut = async () => {
@@ -300,7 +310,7 @@ export default function Page() {
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold">손님 관리 (찾는조건)</h1>
-            <p className="text-sm text-slate-500">필터/검색으로 손님 조건을 빠르게 관리</p>
+            <p className="text-sm text-slate-500">필터/검색 + 추가/수정/삭제</p>
           </div>
           <div className="flex gap-2 flex-wrap">
             <button className="rounded-xl border px-3 py-2 text-sm hover:bg-slate-50" onClick={signOut}>
@@ -336,7 +346,7 @@ export default function Page() {
           ))}
         </div>
 
-        {/* Search */}
+        {/* Search + Table */}
         <div className="rounded-2xl border p-4">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
             <div className="text-sm text-slate-600">
@@ -352,10 +362,12 @@ export default function Page() {
               <button className="rounded-xl border px-3 py-2 text-sm hover:bg-slate-50" onClick={reset}>
                 초기화
               </button>
+              <button className="rounded-xl border px-3 py-2 text-sm hover:bg-slate-50" onClick={load}>
+                새로고침
+              </button>
             </div>
           </div>
 
-          {/* Table */}
           <div className="mt-4 overflow-auto rounded-2xl border">
             <table className="min-w-[1500px] w-full text-sm">
               <thead className="bg-slate-50">
@@ -380,6 +392,7 @@ export default function Page() {
                   ))}
                 </tr>
               </thead>
+
               <tbody>
                 {loading ? (
                   <tr>
@@ -408,10 +421,7 @@ export default function Page() {
                       <td className="p-3">{r.grade ?? "-"}</td>
                       <td className="p-3">{r.note ?? "-"}</td>
                       <td className="p-3 whitespace-nowrap">
-                        <button
-                          className="rounded-xl border px-2 py-1 text-xs hover:bg-white"
-                          onClick={() => openEdit(r)}
-                        >
+                        <button className="rounded-xl border px-2 py-1 text-xs hover:bg-white" onClick={() => openEdit(r)}>
                           수정
                         </button>
                         <button
