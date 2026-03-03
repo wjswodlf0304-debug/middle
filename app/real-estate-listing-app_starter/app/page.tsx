@@ -74,11 +74,14 @@ export default function Page() {
 
   const load = async () => {
     setLoading(true);
-    const res = await fetch("/api/customer-requests", { cache: "no-store" });
-    const json = await res.json();
-    if (res.ok) setRows(json.data || []);
-    else alert(json.error || "불러오기 실패");
-    setLoading(false);
+    try {
+      const res = await fetch("/api/customer-requests", { cache: "no-store" });
+      const json = await res.json();
+      if (res.ok) setRows(json.data || []);
+      else alert(json.error || "불러오기 실패");
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -140,7 +143,9 @@ export default function Page() {
 
   return (
     <div className="min-h-screen p-6">
-      <div className="max-w-6xl mx-auto space-y-4">
+      {/* ✅ 좌우 넓게 */}
+      <div className="w-full max-w-[1600px] mx-auto space-y-4">
+
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-bold">손님 관리</h1>
@@ -157,13 +162,17 @@ export default function Page() {
           </div>
         </div>
 
+        {/* ✅ 표 줄 확실하게 (셀 border) */}
         <div className="overflow-auto border rounded">
-          <table className="min-w-[1200px] w-full text-sm">
-            <thead className="bg-gray-50 border-b">
-              <tr>
-                {["번호","매물종류","구분","지역","예산","입주","옵션","연락처","연락온날","등급","비고","작업"]
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr className="bg-gray-100">
+                {["번호","매물종류","구분","지역","예산","입주","옵션","연락처","다음연락","등급","비고","작업"]
                   .map(h => (
-                    <th key={h} className="p-3 text-left font-semibold">
+                    <th
+                      key={h}
+                      className="border border-gray-300 p-4 text-left font-semibold"
+                    >
                       {h}
                     </th>
                   ))}
@@ -173,31 +182,31 @@ export default function Page() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={12} className="p-6">
+                  <td colSpan={12} className="border border-gray-300 p-6">
                     불러오는중...
                   </td>
                 </tr>
               ) : rows.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="p-6">
+                  <td colSpan={12} className="border border-gray-300 p-6">
                     데이터 없음
                   </td>
                 </tr>
               ) : (
                 rows.map((r, i) => (
-                  <tr key={r.id} className="border-b hover:bg-gray-50">
-                    <td className="p-3">{i + 1}</td>
-                    <td className="p-3 font-medium">{r.property_type ?? "-"}</td>
-                    <td className="p-3">{r.deal_type ?? "-"}</td>
-                    <td className="p-3">{r.preferred_area ?? "-"}</td>
-                    <td className="p-3">{r.budget ?? "-"}</td>
-                    <td className="p-3">{r.move_in_time ?? "-"}</td>
-                    <td className="p-3">{r.wanted_options ?? "-"}</td>
-                    <td className="p-3 font-medium">{r.phone ?? "-"}</td>
-                    <td className="p-3">{r.next_contact_date ?? "-"}</td>
-                    <td className="p-3">{r.grade ?? "-"}</td>
-                    <td className="p-3">{r.note ?? "-"}</td>
-                    <td className="p-3 whitespace-nowrap">
+                  <tr key={r.id} className="hover:bg-gray-50">
+                    <td className="border border-gray-300 p-4">{i + 1}</td>
+                    <td className="border border-gray-300 p-4 font-medium">{r.property_type ?? "-"}</td>
+                    <td className="border border-gray-300 p-4">{r.deal_type ?? "-"}</td>
+                    <td className="border border-gray-300 p-4">{r.preferred_area ?? "-"}</td>
+                    <td className="border border-gray-300 p-4">{r.budget ?? "-"}</td>
+                    <td className="border border-gray-300 p-4">{r.move_in_time ?? "-"}</td>
+                    <td className="border border-gray-300 p-4">{r.wanted_options ?? "-"}</td>
+                    <td className="border border-gray-300 p-4 font-medium">{r.phone ?? "-"}</td>
+                    <td className="border border-gray-300 p-4">{r.next_contact_date ?? "-"}</td>
+                    <td className="border border-gray-300 p-4">{r.grade ?? "-"}</td>
+                    <td className="border border-gray-300 p-4">{r.note ?? "-"}</td>
+                    <td className="border border-gray-300 p-4 whitespace-nowrap">
                       <button onClick={() => openEdit(r)} className="text-blue-600 mr-2">
                         수정
                       </button>
@@ -213,6 +222,7 @@ export default function Page() {
         </div>
       </div>
 
+      {/* 모달 */}
       {open && (
         <div className="fixed inset-0 bg-black/30 flex items-center justify-center p-4">
           <div className="bg-white p-6 rounded w-full max-w-2xl space-y-3">
@@ -225,16 +235,14 @@ export default function Page() {
               onChange={(e) => setForm({ ...form, phone: e.target.value })}
             />
 
-            {/* ✅ 등급 선택 추가 */}
+            {/* ✅ 등급 선택 */}
             <select
               className="border p-2 w-full"
               value={form.grade}
               onChange={(e) => setForm({ ...form, grade: e.target.value })}
             >
               {GRADES.map((g) => (
-                <option key={g} value={g}>
-                  {g}
-                </option>
+                <option key={g} value={g}>{g}</option>
               ))}
             </select>
 
@@ -244,9 +252,7 @@ export default function Page() {
               onChange={(e) => setForm({ ...form, property_type: e.target.value })}
             >
               {PROPERTY_TYPES.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
+                <option key={p} value={p}>{p}</option>
               ))}
             </select>
 
@@ -256,9 +262,7 @@ export default function Page() {
               onChange={(e) => setForm({ ...form, deal_type: e.target.value })}
             >
               {DEAL_TYPES.map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
+                <option key={d} value={d}>{d}</option>
               ))}
             </select>
 
