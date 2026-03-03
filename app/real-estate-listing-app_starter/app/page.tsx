@@ -111,7 +111,7 @@ export default function Page() {
           <table className="min-w-[1200px] w-full text-sm">
             <thead className="bg-gray-50">
               <tr>
-                {["번호","매물종류","구분","지역","예산","입주","옵션","연락처","다음연락","등급","비고","작업"]
+                {["번호","매물종류","구분","지역","예산","입주","옵션","연락처","연락온날","등급","비고","작업"]
                   .map(h => <th key={h} className="p-2 text-left">{h}</th>)}
               </tr>
             </thead>
