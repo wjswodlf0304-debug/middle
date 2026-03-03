@@ -110,7 +110,7 @@ export default function Page() {
   };
 
   const remove = async (r: Row) => {
-    if (!confirm(`삭제할까?\n\n연락처: ${r.phone}\n매물종류: ${r.property_type ?? "-"}`)) return;
+    if (!confirm(`삭제할까요?\n\n연락처: ${r.phone}\n매물종류: ${r.property_type ?? "-"}`)) return;
 
     const res = await fetch(`/api/customer-requests?id=${encodeURIComponent(r.id)}`, {
       method: "DELETE",
@@ -194,19 +194,19 @@ export default function Page() {
           </div>
 
           <div className="flex flex-col md:flex-row gap-2">
-            <input
-              className="border rounded px-3 py-2 text-sm w-full"
-              placeholder="검색: 연락처/지역/예산/옵션/비고 등"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-            />
-            <button
-              className="border rounded px-3 py-2 text-sm hover:bg-gray-50"
-              onClick={() => setQ("")}
-            >
-              검색초기화
-            </button>
-          </div>
+  <input
+    className="border rounded px-3 py-2 text-sm w-full md:flex-1"
+    placeholder="검색: 연락처/지역/예산/옵션/비고 등"
+    value={q}
+    onChange={(e) => setQ(e.target.value)}
+  />
+  <button
+    className="border rounded px-4 py-2 text-sm hover:bg-gray-50 whitespace-nowrap"
+    onClick={() => setQ("")}
+  >
+    초기화
+  </button>
+</div>
 
           <div className="text-sm text-gray-600">
             표시: <span className="font-semibold text-black">{filteredRows.length}</span>명
