@@ -21,6 +21,32 @@ type Row = {
   note: string | null;
 };
 
+type FormState = {
+  phone: string;
+  grade: string;
+  deal_type: string;
+  property_type: string;
+  preferred_area: string;
+  budget: string;
+  move_in_time: string;
+  wanted_options: string;
+  next_contact_date: string;
+  note: string;
+};
+
+const EMPTY_FORM: FormState = {
+  phone: "",
+  grade: "B",
+  deal_type: "전세",
+  property_type: "원룸",
+  preferred_area: "",
+  budget: "",
+  move_in_time: "",
+  wanted_options: "",
+  next_contact_date: "",
+  note: "",
+};
+
 export default function Page() {
   const supabase = createClient();
 
@@ -32,27 +58,18 @@ export default function Page() {
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Row | null>(null);
-
-  const [form, setForm] = useState<any>({
-    phone: "",
-    grade: "B",
-    deal_type: "전세",
-    property_type: "원룸",
-    preferred_area: "",
-    budget: "",
-    move_in_time: "",
-    wanted_options: "",
-    next_contact_date: "",
-    note: "",
-  });
+  const [form, setForm] = useState<FormState>(EMPTY_FORM);
 
   const load = async () => {
     setLoading(true);
-    const res = await fetch("/api/customer-requests", { cache: "no-store" });
-    const json = await res.json();
-    if (res.ok) setRows(json.data || []);
-    else alert(json.error || "불러오기 실패");
-    setLoading(false);
+    try {
+      const res = await fetch("/api/customer-requests", { cache: "no-store" });
+      const json = await res.json();
+      if (res.ok) setRows(json.data || []);
+      else alert(json?.error || "불러오기 실패");
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { load(); }, []);
@@ -61,10 +78,7 @@ export default function Page() {
     const s = q.trim().toLowerCase();
 
     return rows.filter((r) => {
-      // 1) 매물종류 필터
       if (filterType !== "전체" && r.property_type !== filterType) return false;
-
-      // 2) 검색 필터
       if (!s) return true;
 
       const hay = [
@@ -78,68 +92,17 @@ export default function Page() {
         r.move_in_time,
         r.grade,
         r.next_contact_date,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
+      ].filter(Boolean).join(" ").toLowerCase();
 
       return hay.includes(s);
     });
   }, [rows, filterType, q]);
 
-  const save = async () => {
-    if (!form.phone.trim()) {
-      alert("연락처는 필수");
-      return;
-    }
-
-    const body = editing ? { id: editing.id, ...form } : form;
-
-    const res = await fetch("/api/customer-requests", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-
-    const json = await res.json();
-    if (!res.ok) return alert(json.error || "저장 실패");
-
-    setOpen(false);
-    setEditing(null);
-    await load();
-  };
-
-  const remove = async (r: Row) => {
-    if (!confirm(`삭제할까요?\n\n연락처: ${r.phone}\n매물종류: ${r.property_type ?? "-"}`)) return;
-
-    const res = await fetch(`/api/customer-requests?id=${encodeURIComponent(r.id)}`, {
-      method: "DELETE",
-    });
-
-    const json = await res.json();
-    if (!res.ok) return alert(json.error || "삭제 실패");
-
-    await load();
-  };
-
-  const signOut = async () => {
-    await supabase.auth.signOut();
-    window.location.href = "/login";
-  };
-
   const openAdd = () => {
     setEditing(null);
     setForm({
-      phone: "",
-      grade: "B",
-      deal_type: "전세",
-      property_type: "원룸",
-      preferred_area: "",
-      budget: "",
-      move_in_time: "",
-      wanted_options: "",
-      next_contact_date: "",
-      note: "",
+      ...EMPTY_FORM,
+      property_type: filterType === "전체" ? "원룸" : filterType, // 현재 필터를 기본값으로
     });
     setOpen(true);
   };
@@ -161,32 +124,72 @@ export default function Page() {
     setOpen(true);
   };
 
+  const save = async () => {
+    if (!form.phone.trim()) return alert("연락처는 필수");
+
+    const body = editing ? { id: editing.id, ...form } : form;
+
+    const res = await fetch("/api/customer-requests", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const json = await res.json();
+
+    if (!res.ok) return alert(json?.error || "저장 실패");
+
+    setOpen(false);
+    setEditing(null);
+    await load();
+  };
+
+  const remove = async (r: Row) => {
+    const ok = confirm(`삭제할까?\n\n연락처: ${r.phone}\n매물종류: ${r.property_type ?? "-"}`);
+    if (!ok) return;
+
+    const res = await fetch(`/api/customer-requests?id=${encodeURIComponent(r.id)}`, { method: "DELETE" });
+    const json = await res.json();
+
+    if (!res.ok) return alert(json?.error || "삭제 실패");
+    await load();
+  };
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    window.location.assign("/login");
+  };
+
   return (
-    <div className="min-h-screen p-6">
+    <div className="min-h-screen p-4 md:p-6">
       <div className="w-full max-w-[1600px] mx-auto space-y-4">
 
-        <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold">손님 관리</h1>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold">손님 관리</h1>
+            <div className="text-sm text-gray-500">매물분류/검색 + 추가/수정/삭제</div>
+          </div>
+
           <div className="flex gap-2">
-            <button onClick={signOut} className="border px-3 py-1.5 rounded">
+            <button onClick={signOut} className="border px-3 py-2 rounded">
               로그아웃
             </button>
-            <button onClick={openAdd} className="bg-black text-white px-3 py-1.5 rounded">
+            <button onClick={openAdd} className="bg-black text-white px-3 py-2 rounded">
               + 손님 추가
             </button>
           </div>
         </div>
 
-        {/* ✅ 필터 + 검색 */}
+        {/* 필터 + 검색 */}
         <div className="border rounded p-3 space-y-3">
           <div className="flex flex-wrap gap-2">
             {PROPERTY_TYPES.map((type) => (
               <button
                 key={type}
                 onClick={() => setFilterType(type)}
-                className={`px-3 py-1 rounded text-sm border ${
-                  filterType === type ? "bg-black text-white" : "bg-white hover:bg-gray-100"
-                }`}
+                className={[
+                  "px-3 py-1 rounded text-sm border",
+                  filterType === type ? "bg-black text-white" : "bg-white hover:bg-gray-100",
+                ].join(" ")}
               >
                 {type}
               </button>
@@ -194,59 +197,98 @@ export default function Page() {
           </div>
 
           <div className="flex flex-col md:flex-row gap-2">
-  <input
-    className="border rounded px-3 py-2 text-sm w-full md:flex-1"
-    placeholder="검색: 연락처/지역/예산/옵션/비고 등"
-    value={q}
-    onChange={(e) => setQ(e.target.value)}
-  />
-  <button
-    className="border rounded px-4 py-2 text-sm hover:bg-gray-50 whitespace-nowrap"
-    onClick={() => setQ("")}
-  >
-    초기화
-  </button>
-</div>
+            <input
+              className="border rounded px-3 py-2 text-sm w-full md:flex-1"
+              placeholder="검색: 연락처/지역/예산/옵션/비고 등"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+            <button
+              className="border rounded px-4 py-2 text-sm hover:bg-gray-50 whitespace-nowrap"
+              onClick={() => setQ("")}
+            >
+              초기화
+            </button>
+            <button
+              className="border rounded px-4 py-2 text-sm hover:bg-gray-50 whitespace-nowrap"
+              onClick={load}
+            >
+              새로고침
+            </button>
+          </div>
 
           <div className="text-sm text-gray-600">
             표시: <span className="font-semibold text-black">{filteredRows.length}</span>명
           </div>
         </div>
 
-        {/* ✅ 표 */}
-        <div className="overflow-auto border rounded">
+        {/* ✅ 모바일: 카드뷰 */}
+        <div className="md:hidden space-y-2">
+          {loading ? (
+            <div className="border rounded p-3 text-sm">불러오는중...</div>
+          ) : filteredRows.length === 0 ? (
+            <div className="border rounded p-3 text-sm">데이터 없음</div>
+          ) : (
+            filteredRows.map((r) => (
+              <div key={r.id} className="border rounded p-3 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="font-semibold">
+                    {r.property_type ?? "-"} · {r.deal_type ?? "-"}
+                  </div>
+                  <div className="text-xs border rounded px-2 py-0.5">
+                    등급 {r.grade ?? "-"}
+                  </div>
+                </div>
+
+                <div className="text-sm space-y-1">
+                  <div>연락처: <span className="font-medium">{r.phone}</span></div>
+                  <div>지역: {r.preferred_area ?? "-"}</div>
+                  <div>예산: {r.budget ?? "-"}</div>
+                  <div>입주: {r.move_in_time ?? "-"}</div>
+                  <div>옵션: {r.wanted_options ?? "-"}</div>
+                  <div>다음연락: {r.next_contact_date ?? "-"}</div>
+                  {r.note ? <div>비고: {r.note}</div> : null}
+                </div>
+
+                <div className="flex justify-end gap-2 pt-1">
+                  <button onClick={() => openEdit(r)} className="border rounded px-3 py-1 text-sm">
+                    수정
+                  </button>
+                  <button onClick={() => remove(r)} className="border rounded px-3 py-1 text-sm text-red-600">
+                    삭제
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* ✅ PC: 테이블뷰 */}
+        <div className="hidden md:block overflow-auto border rounded">
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="bg-gray-100">
-                {["번호","매물종류","구분","지역","예산","입주","옵션","연락처","연락온날","등급","비고","작업"]
-                  .map(h => (
-                    <th
-                      key={h}
-                      className="border border-gray-300 py-2 px-3 text-left font-semibold"
-                    >
-                      {h}
-                    </th>
-                  ))}
+                {["번호","매물종류","구분","지역","예산","입주","옵션","연락처","다음연락","등급","비고","작업"].map((h) => (
+                  <th key={h} className="border border-gray-300 py-2 px-3 text-left font-semibold">
+                    {h}
+                  </th>
+                ))}
               </tr>
             </thead>
 
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={12} className="border border-gray-300 py-3 px-3">
-                    불러오는중...
-                  </td>
+                  <td colSpan={12} className="border border-gray-300 py-3 px-3">불러오는중...</td>
                 </tr>
               ) : filteredRows.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="border border-gray-300 py-3 px-3">
-                    데이터 없음
-                  </td>
+                  <td colSpan={12} className="border border-gray-300 py-3 px-3">데이터 없음</td>
                 </tr>
               ) : (
                 filteredRows.map((r, i) => (
                   <tr key={r.id} className="hover:bg-gray-50">
-                    <td className="border border-gray-300 py-2 px-3">{i+1}</td>
+                    <td className="border border-gray-300 py-2 px-3">{i + 1}</td>
                     <td className="border border-gray-300 py-2 px-3">{r.property_type ?? "-"}</td>
                     <td className="border border-gray-300 py-2 px-3">{r.deal_type ?? "-"}</td>
                     <td className="border border-gray-300 py-2 px-3">{r.preferred_area ?? "-"}</td>
@@ -258,12 +300,8 @@ export default function Page() {
                     <td className="border border-gray-300 py-2 px-3">{r.grade ?? "-"}</td>
                     <td className="border border-gray-300 py-2 px-3">{r.note ?? "-"}</td>
                     <td className="border border-gray-300 py-2 px-3 whitespace-nowrap">
-                      <button onClick={() => openEdit(r)} className="text-blue-600 mr-2">
-                        수정
-                      </button>
-                      <button onClick={() => remove(r)} className="text-red-600">
-                        삭제
-                      </button>
+                      <button onClick={() => openEdit(r)} className="text-blue-600 mr-2">수정</button>
+                      <button onClick={() => remove(r)} className="text-red-600">삭제</button>
                     </td>
                   </tr>
                 ))
@@ -287,70 +325,41 @@ export default function Page() {
               onChange={(e) => setForm({ ...form, phone: e.target.value })}
             />
 
-            <select
-              className="border p-2 w-full"
-              value={form.grade}
+            <select className="border p-2 w-full" value={form.grade}
               onChange={(e) => setForm({ ...form, grade: e.target.value })}
             >
               {GRADES.map((g) => <option key={g} value={g}>{g}</option>)}
             </select>
 
-            <select
-              className="border p-2 w-full"
-              value={form.property_type}
+            <select className="border p-2 w-full" value={form.property_type}
               onChange={(e) => setForm({ ...form, property_type: e.target.value })}
             >
               {PROPERTY_TYPES.filter(x => x !== "전체").map((p) => <option key={p} value={p}>{p}</option>)}
             </select>
 
-            <select
-              className="border p-2 w-full"
-              value={form.deal_type}
+            <select className="border p-2 w-full" value={form.deal_type}
               onChange={(e) => setForm({ ...form, deal_type: e.target.value })}
             >
               {DEAL_TYPES.map((d) => <option key={d} value={d}>{d}</option>)}
             </select>
 
-            <input
-              placeholder="희망지역"
-              className="border p-2 w-full"
-              value={form.preferred_area}
-              onChange={(e) => setForm({ ...form, preferred_area: e.target.value })}
+            <input className="border p-2 w-full" placeholder="희망지역(동)"
+              value={form.preferred_area} onChange={(e) => setForm({ ...form, preferred_area: e.target.value })}
             />
-
-            <input
-              placeholder="예산"
-              className="border p-2 w-full"
-              value={form.budget}
-              onChange={(e) => setForm({ ...form, budget: e.target.value })}
+            <input className="border p-2 w-full" placeholder="예산"
+              value={form.budget} onChange={(e) => setForm({ ...form, budget: e.target.value })}
             />
-
-            <input
-              placeholder="입주희망시기"
-              className="border p-2 w-full"
-              value={form.move_in_time}
-              onChange={(e) => setForm({ ...form, move_in_time: e.target.value })}
+            <input className="border p-2 w-full" placeholder="입주희망시기"
+              value={form.move_in_time} onChange={(e) => setForm({ ...form, move_in_time: e.target.value })}
             />
-
-            <input
-              placeholder="원하는옵션"
-              className="border p-2 w-full"
-              value={form.wanted_options}
-              onChange={(e) => setForm({ ...form, wanted_options: e.target.value })}
+            <input className="border p-2 w-full" placeholder="원하는옵션(자유기입)"
+              value={form.wanted_options} onChange={(e) => setForm({ ...form, wanted_options: e.target.value })}
             />
-
-            <input
-              type="date"
-              className="border p-2 w-full"
-              value={form.next_contact_date}
-              onChange={(e) => setForm({ ...form, next_contact_date: e.target.value })}
+            <input type="date" className="border p-2 w-full"
+              value={form.next_contact_date} onChange={(e) => setForm({ ...form, next_contact_date: e.target.value })}
             />
-
-            <textarea
-              placeholder="비고"
-              className="border p-2 w-full"
-              value={form.note}
-              onChange={(e) => setForm({ ...form, note: e.target.value })}
+            <textarea className="border p-2 w-full" placeholder="비고"
+              value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })}
             />
 
             <div className="flex justify-end gap-2 pt-2">
