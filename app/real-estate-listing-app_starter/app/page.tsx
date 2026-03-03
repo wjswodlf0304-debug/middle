@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/browser";
 
-const DEAL_TYPES = ["매매", "전세", "월세"] as const;
-const PROPERTY_TYPES = ["상가","사무실","원룸","투룸","쓰리룸","아파트","빌라","단독","건물","토지"] as const;
-const GRADES = ["A","B","C"] as const;
+const DEAL_TYPES = ["매매", "전세", "월세"];
+const PROPERTY_TYPES = ["전체","상가","사무실","원룸","투룸","쓰리룸","아파트","빌라","단독","건물","토지"];
+const GRADES = ["A","B","C"];
 
 type Row = {
   id: string;
@@ -21,84 +21,44 @@ type Row = {
   note: string | null;
 };
 
-type FormState = {
-  phone: string;
-  grade: string;
-  deal_type: string;
-  property_type: string;
-  preferred_area: string;
-  budget: string;
-  move_in_time: string;
-  wanted_options: string;
-  next_contact_date: string;
-  note: string;
-};
-
-const EMPTY_FORM: FormState = {
-  phone: "",
-  grade: "B",
-  deal_type: "전세",
-  property_type: "원룸",
-  preferred_area: "",
-  budget: "",
-  move_in_time: "",
-  wanted_options: "",
-  next_contact_date: "",
-  note: "",
-};
-
-function mapRowToForm(r: Row): FormState {
-  return {
-    phone: r.phone || "",
-    grade: r.grade || "B",
-    deal_type: r.deal_type || "전세",
-    property_type: r.property_type || "원룸",
-    preferred_area: r.preferred_area || "",
-    budget: r.budget || "",
-    move_in_time: r.move_in_time || "",
-    wanted_options: r.wanted_options || "",
-    next_contact_date: r.next_contact_date || "",
-    note: r.note || "",
-  };
-}
-
 export default function Page() {
   const supabase = createClient();
 
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filterType, setFilterType] = useState("전체");
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Row | null>(null);
-  const [form, setForm] = useState<FormState>(EMPTY_FORM);
+
+  const [form, setForm] = useState<any>({
+    phone: "",
+    grade: "B",
+    deal_type: "전세",
+    property_type: "원룸",
+    preferred_area: "",
+    budget: "",
+    move_in_time: "",
+    wanted_options: "",
+    next_contact_date: "",
+    note: "",
+  });
 
   const load = async () => {
     setLoading(true);
-    try {
-      const res = await fetch("/api/customer-requests", { cache: "no-store" });
-      const json = await res.json();
-      if (res.ok) setRows(json.data || []);
-      else alert(json.error || "불러오기 실패");
-    } finally {
-      setLoading(false);
-    }
+    const res = await fetch("/api/customer-requests", { cache: "no-store" });
+    const json = await res.json();
+    if (res.ok) setRows(json.data || []);
+    else alert(json.error);
+    setLoading(false);
   };
 
-  useEffect(() => {
-    load();
-  }, []);
+  useEffect(() => { load(); }, []);
 
-  const openAdd = () => {
-    setEditing(null);
-    setForm(EMPTY_FORM);
-    setOpen(true);
-  };
-
-  const openEdit = (r: Row) => {
-    setEditing(r);
-    setForm(mapRowToForm(r));
-    setOpen(true);
-  };
+  const filteredRows = useMemo(() => {
+    if (filterType === "전체") return rows;
+    return rows.filter(r => r.property_type === filterType);
+  }, [rows, filterType]);
 
   const save = async () => {
     if (!form.phone.trim()) {
@@ -115,24 +75,17 @@ export default function Page() {
     });
 
     const json = await res.json();
-    if (!res.ok) return alert(json.error || "저장 실패");
+    if (!res.ok) return alert(json.error);
 
     setOpen(false);
     setEditing(null);
-    setForm(EMPTY_FORM);
     await load();
   };
 
   const remove = async (r: Row) => {
-    if (!confirm(`삭제할까?\n\n연락처: ${r.phone}\n매물종류: ${r.property_type ?? "-"}`)) return;
+    if (!confirm("삭제할까?")) return;
 
-    const res = await fetch(`/api/customer-requests?id=${encodeURIComponent(r.id)}`, {
-      method: "DELETE",
-    });
-
-    const json = await res.json();
-    if (!res.ok) return alert(json.error || "삭제 실패");
-
+    await fetch(`/api/customer-requests?id=${r.id}`, { method: "DELETE" });
     await load();
   };
 
@@ -143,36 +96,46 @@ export default function Page() {
 
   return (
     <div className="min-h-screen p-6">
-      {/* ✅ 좌우 넓게 */}
       <div className="w-full max-w-[1600px] mx-auto space-y-4">
 
         <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold">손님 관리</h1>
-            <div className="text-sm text-gray-500">표에서 바로 수정/삭제 가능</div>
-          </div>
-
+          <h1 className="text-2xl font-bold">손님 관리</h1>
           <div className="flex gap-2">
-            <button onClick={signOut} className="border px-3 py-2 rounded">
+            <button onClick={signOut} className="border px-3 py-1.5 rounded">
               로그아웃
             </button>
-            <button onClick={openAdd} className="bg-black text-white px-3 py-2 rounded">
+            <button onClick={() => { setEditing(null); setOpen(true); }}
+              className="bg-black text-white px-3 py-1.5 rounded">
               + 손님 추가
             </button>
           </div>
         </div>
 
-        {/* ✅ 표 줄 확실하게 (셀 border) */}
+        {/* ✅ 매물 분류 필터 */}
+        <div className="flex flex-wrap gap-2 border-b pb-3">
+          {PROPERTY_TYPES.map(type => (
+            <button
+              key={type}
+              onClick={() => setFilterType(type)}
+              className={`px-3 py-1 rounded text-sm border 
+                ${filterType === type 
+                  ? "bg-black text-white" 
+                  : "bg-white hover:bg-gray-100"}`}
+            >
+              {type}
+            </button>
+          ))}
+        </div>
+
+        {/* ✅ 표 */}
         <div className="overflow-auto border rounded">
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="bg-gray-100">
                 {["번호","매물종류","구분","지역","예산","입주","옵션","연락처","다음연락","등급","비고","작업"]
                   .map(h => (
-                    <th
-                      key={h}
-                      className="border border-gray-300 p-4 text-left font-semibold"
-                    >
+                    <th key={h}
+                      className="border border-gray-300 py-2 px-3 text-left font-semibold">
                       {h}
                     </th>
                   ))}
@@ -182,32 +145,39 @@ export default function Page() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={12} className="border border-gray-300 p-6">
+                  <td colSpan={12} className="border border-gray-300 py-3 px-3">
                     불러오는중...
                   </td>
                 </tr>
-              ) : rows.length === 0 ? (
+              ) : filteredRows.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="border border-gray-300 p-6">
+                  <td colSpan={12} className="border border-gray-300 py-3 px-3">
                     데이터 없음
                   </td>
                 </tr>
               ) : (
-                rows.map((r, i) => (
+                filteredRows.map((r, i) => (
                   <tr key={r.id} className="hover:bg-gray-50">
-                    <td className="border border-gray-300 p-4">{i + 1}</td>
-                    <td className="border border-gray-300 p-4 font-medium">{r.property_type ?? "-"}</td>
-                    <td className="border border-gray-300 p-4">{r.deal_type ?? "-"}</td>
-                    <td className="border border-gray-300 p-4">{r.preferred_area ?? "-"}</td>
-                    <td className="border border-gray-300 p-4">{r.budget ?? "-"}</td>
-                    <td className="border border-gray-300 p-4">{r.move_in_time ?? "-"}</td>
-                    <td className="border border-gray-300 p-4">{r.wanted_options ?? "-"}</td>
-                    <td className="border border-gray-300 p-4 font-medium">{r.phone ?? "-"}</td>
-                    <td className="border border-gray-300 p-4">{r.next_contact_date ?? "-"}</td>
-                    <td className="border border-gray-300 p-4">{r.grade ?? "-"}</td>
-                    <td className="border border-gray-300 p-4">{r.note ?? "-"}</td>
-                    <td className="border border-gray-300 p-4 whitespace-nowrap">
-                      <button onClick={() => openEdit(r)} className="text-blue-600 mr-2">
+                    <td className="border border-gray-300 py-2 px-3">{i+1}</td>
+                    <td className="border border-gray-300 py-2 px-3">{r.property_type}</td>
+                    <td className="border border-gray-300 py-2 px-3">{r.deal_type}</td>
+                    <td className="border border-gray-300 py-2 px-3">{r.preferred_area}</td>
+                    <td className="border border-gray-300 py-2 px-3">{r.budget}</td>
+                    <td className="border border-gray-300 py-2 px-3">{r.move_in_time}</td>
+                    <td className="border border-gray-300 py-2 px-3">{r.wanted_options}</td>
+                    <td className="border border-gray-300 py-2 px-3 font-medium">{r.phone}</td>
+                    <td className="border border-gray-300 py-2 px-3">{r.next_contact_date}</td>
+                    <td className="border border-gray-300 py-2 px-3">{r.grade}</td>
+                    <td className="border border-gray-300 py-2 px-3">{r.note}</td>
+                    <td className="border border-gray-300 py-2 px-3 whitespace-nowrap">
+                      <button
+                        onClick={() => {
+                          setEditing(r);
+                          setForm(r);
+                          setOpen(true);
+                        }}
+                        className="text-blue-600 mr-2"
+                      >
                         수정
                       </button>
                       <button onClick={() => remove(r)} className="text-red-600">
@@ -221,111 +191,6 @@ export default function Page() {
           </table>
         </div>
       </div>
-
-      {/* 모달 */}
-      {open && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center p-4">
-          <div className="bg-white p-6 rounded w-full max-w-2xl space-y-3">
-            <h2 className="font-bold">{editing ? "손님 수정" : "손님 추가"}</h2>
-
-            <input
-              placeholder="연락처"
-              className="border p-2 w-full"
-              value={form.phone}
-              onChange={(e) => setForm({ ...form, phone: e.target.value })}
-            />
-
-            {/* ✅ 등급 선택 */}
-            <select
-              className="border p-2 w-full"
-              value={form.grade}
-              onChange={(e) => setForm({ ...form, grade: e.target.value })}
-            >
-              {GRADES.map((g) => (
-                <option key={g} value={g}>{g}</option>
-              ))}
-            </select>
-
-            <select
-              className="border p-2 w-full"
-              value={form.property_type}
-              onChange={(e) => setForm({ ...form, property_type: e.target.value })}
-            >
-              {PROPERTY_TYPES.map((p) => (
-                <option key={p} value={p}>{p}</option>
-              ))}
-            </select>
-
-            <select
-              className="border p-2 w-full"
-              value={form.deal_type}
-              onChange={(e) => setForm({ ...form, deal_type: e.target.value })}
-            >
-              {DEAL_TYPES.map((d) => (
-                <option key={d} value={d}>{d}</option>
-              ))}
-            </select>
-
-            <input
-              placeholder="희망지역"
-              className="border p-2 w-full"
-              value={form.preferred_area}
-              onChange={(e) => setForm({ ...form, preferred_area: e.target.value })}
-            />
-
-            <input
-              placeholder="예산"
-              className="border p-2 w-full"
-              value={form.budget}
-              onChange={(e) => setForm({ ...form, budget: e.target.value })}
-            />
-
-            <input
-              placeholder="입주희망시기"
-              className="border p-2 w-full"
-              value={form.move_in_time}
-              onChange={(e) => setForm({ ...form, move_in_time: e.target.value })}
-            />
-
-            <input
-              placeholder="원하는옵션"
-              className="border p-2 w-full"
-              value={form.wanted_options}
-              onChange={(e) => setForm({ ...form, wanted_options: e.target.value })}
-            />
-
-            <input
-              type="date"
-              className="border p-2 w-full"
-              value={form.next_contact_date}
-              onChange={(e) => setForm({ ...form, next_contact_date: e.target.value })}
-            />
-
-            <textarea
-              placeholder="비고"
-              className="border p-2 w-full"
-              value={form.note}
-              onChange={(e) => setForm({ ...form, note: e.target.value })}
-            />
-
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                onClick={() => {
-                  setOpen(false);
-                  setEditing(null);
-                  setForm(EMPTY_FORM);
-                }}
-                className="border px-3 py-2 rounded"
-              >
-                취소
-              </button>
-              <button onClick={save} className="bg-black text-white px-3 py-2 rounded">
-                저장
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
