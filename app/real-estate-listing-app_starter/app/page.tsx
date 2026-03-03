@@ -246,7 +246,7 @@ export default function Page() {
                   <div>예산: {r.budget ?? "-"}</div>
                   <div>입주: {r.move_in_time ?? "-"}</div>
                   <div>옵션: {r.wanted_options ?? "-"}</div>
-                  <div>다음연락: {r.next_contact_date ?? "-"}</div>
+                  <div>연락온날: {r.next_contact_date ?? "-"}</div>
                   {r.note ? <div>비고: {r.note}</div> : null}
                 </div>
 
