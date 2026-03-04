@@ -1,29 +1,27 @@
-import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { createServerClient } from "@supabase/ssr";
 
-export async function createClient() {
-  const cookieStore = await cookies();
+export function createClient() {
+  const cookieStore = cookies();
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const key =
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-  return createServerClient(url, key, {
-    cookies: {
-      getAll() {
-        return cookieStore.getAll();
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(cookiesToSet: any[]) {
+          try {
+            cookiesToSet.forEach((cookie: any) => {
+              cookieStore.set(cookie.name, cookie.value, cookie.options);
+            });
+          } catch {
+            // Server Components에서는 setAll이 막히는 경우가 있어서 무시
+          }
+        },
       },
-      setAll(cookiesToSet: any[]) {
-        try {
-          cookiesToSet.forEach(({ name, value, options }: any) => {
-  cookieStore.set(name, value, options);
-});
-          });
-        } catch {
-          // ignore
-        }
-      },
-    },
-  });
+    }
+  );
 }
