@@ -166,7 +166,7 @@ export default function Page() {
         <div className="flex items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold">손님 관리</h1>
-            <div className="text-sm text-gray-500">매물분류/검색 + 추가/수정/삭제</div>
+            <div className="text-sm text-gray-500">중앙공인중개사사무소 전용 사이트입니다!</div>
           </div>
 
           <div className="flex gap-2">
