@@ -242,7 +242,7 @@ export default function Page() {
 
                 <div className="text-sm space-y-1">
                   <div>연락처: <span className="font-medium">{r.phone}</span></div>
-                  <div>지역: {r.preferred_area ?? "-"}</div>
+                  <div>희망지역: {r.preferred_area ?? "-"}</div>
                   <div>예산: {r.budget ?? "-"}</div>
                   <div>입주: {r.move_in_time ?? "-"}</div>
                   <div>옵션: {r.wanted_options ?? "-"}</div>
@@ -268,7 +268,7 @@ export default function Page() {
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="bg-gray-100">
-                {["번호","매물종류","구분","지역","예산","입주","옵션","연락처","연락온날","등급","비고","작업"].map((h) => (
+                {["번호","매물종류","구분","희망지역","예산","입주","옵션","연락처","연락온날","등급","비고","작업"].map((h) => (
                   <th key={h} className="border border-gray-300 py-2 px-3 text-left font-semibold">
                     {h}
                   </th>
