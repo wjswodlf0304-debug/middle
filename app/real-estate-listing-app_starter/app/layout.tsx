@@ -2,7 +2,7 @@ import "./globals.css";
 import React from "react";
 
 export const metadata = {
-  title: "매물 관리",
+  title: "손님 관리",
   description: "Vercel + Supabase 관리자 페이지",
 };
 
